@@ -23,132 +23,101 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 //
-#include "xbmc_scr_dll.h"
+
+#include "main.h"
+#include "Asteroids.h"
+#include "timer.h"
+
+#include <kodi/api2/Addon.hpp>
+#include <kodi/api2/screensaver/Addon.hpp>
 #ifndef WIN32
 #include <GL/gl.h>
 #else
 #include <d3d11.h>
 #endif
-#include "main.h"
-#include "Asteroids.h"
-#include "timer.h"
-
-CAsteroids*  gAsteroids = null;
-CRenderD3D   gRender;
-CTimer*      gTimer = null;
-
-extern "C" {
-
 #include <time.h>
 
-
-extern "C" void Stop();
-
-ADDON_STATUS ADDON_Create(void* hdl, void* props)
+CRenderD3D gRender;
+  
+class CScreensaverAsteroids : public Screensaver::CAddonInterface
 {
-  if (!props)
-    return ADDON_STATUS_UNKNOWN;
+public:
+  CScreensaverAsteroids(void* kodiInstance);
+  virtual ~CScreensaverAsteroids();
+  virtual void Start() override;
+  void Stop();
+  virtual void Render() override;
 
-  SCR_PROPS* scrprops = (SCR_PROPS*)props;
+private:
+  CAsteroids* m_asteroids;
+  CTimer* m_timer;
+};
+  
+CScreensaverAsteroids::CScreensaverAsteroids(void* kodiInstance)
+  : Screensaver::CAddonInterface(kodiInstance),
+    m_asteroids(nullptr)
+{
+  gRender.Init(GetProperties()->device);
+  gRender.m_Width = GetProperties()->width;
+  gRender.m_Height = GetProperties()->height;
+}
 
-  gRender.Init(scrprops->device);
-  gRender.m_Width = scrprops->width;
-  gRender.m_Height = scrprops->height;
-
-  return ADDON_STATUS_OK;
+CScreensaverAsteroids::~CScreensaverAsteroids()
+{
 }
 
 ////////////////////////////////////////////////////////////////////////////
-// XBMC tells us we should get ready to start rendering. This function
-// is called once when the screensaver is activated by XBMC.
+// Kodi tells us we should get ready to start rendering. This function
+// is called once when the screensaver is activated by Kodi.
 //
-extern "C" void Start()
+void CScreensaverAsteroids::Start()
 {
   srand((u32)time(null));
-  gAsteroids = new CAsteroids();
-  if (!gAsteroids)
+  m_asteroids = new CAsteroids();
+  if (!m_asteroids)
     return;
-  gTimer = new CTimer();
-  gTimer->Init();
-  if (!gRender.RestoreDevice())        Stop();
-  if (!gAsteroids->RestoreDevice(&gRender))  Stop();
+ 
+  m_timer = new CTimer();
+  m_timer->Init();
+  
+  if (!gRender.RestoreDevice())
+    Stop();
+  
+  if (!m_asteroids->RestoreDevice(&gRender))
+    Stop();
 }
 
 ////////////////////////////////////////////////////////////////////////////
-// XBMC tells us to render a frame of our screensaver. This is called on
-// each frame render in XBMC, you should render a single frame only - the DX
+// Kodi tells us to stop the screensaver we should free any memory and release
+// any resources we have created.
+//
+void CScreensaverAsteroids::Stop()
+{
+  if (!m_asteroids)
+    return;
+
+  gRender.InvalidateDevice();
+  m_asteroids->InvalidateDevice(&gRender);
+  SAFE_DELETE(m_asteroids);
+  SAFE_DELETE(m_timer);
+}
+
+////////////////////////////////////////////////////////////////////////////
+// Kodi tells us to render a frame of our screensaver. This is called on
+// each frame render in Kodi, you should render a single frame only - the DX
 // device will already have been cleared.
 //
-extern "C" void Render()
+void CScreensaverAsteroids::Render()
 {
-  if (!gAsteroids)
+  if (!m_asteroids)
     return;
+
   gRender.Begin();
-  gTimer->Update();
-  gAsteroids->Update(gTimer->GetDeltaTime());
-  gAsteroids->Draw(&gRender);
+  m_timer->Update();
+  m_asteroids->Update(m_timer->GetDeltaTime());
+  m_asteroids->Draw(&gRender);
   gRender.Draw();
 }
-
-////////////////////////////////////////////////////////////////////////////
-// XBMC tells us to stop the screensaver we should free any memory and release
-// any resources we have created.
-//
-extern "C" void Stop()
-{
-  if (!gAsteroids)
-    return;
-  gRender.InvalidateDevice();
-  gAsteroids->InvalidateDevice(&gRender);
-  SAFE_DELETE(gAsteroids);
-  SAFE_DELETE(gTimer);
-}
-
-// XBMC tells us to stop the screensaver
-// we should free any memory and release
-// any resources we have created.
-extern "C" void ADDON_Stop()
-{
-}
-
-void ADDON_Destroy()
-{
-}
-
-ADDON_STATUS ADDON_GetStatus()
-{
-  return ADDON_STATUS_OK;
-}
-
-bool ADDON_HasSettings()
-{
-  return false;
-}
-
-unsigned int ADDON_GetSettings(ADDON_StructSetting ***sSet)
-{
-  return 0;
-}
-
-ADDON_STATUS ADDON_SetSetting(const char *strSetting, const void *value)
-{
-  return ADDON_STATUS_OK;
-}
-
-void ADDON_FreeSettings()
-{
-}
-
-void ADDON_Announce(const char *flag, const char *sender, const char *message, const void *data)
-{
-}
-
-void GetInfo(SCR_INFO *info)
-{
-}
-
-};
-
 
 ////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
@@ -326,3 +295,27 @@ void CRenderD3D::DrawLine(const CVector2& pos1, const CVector2& pos2, const CRGB
 
   m_NumLines++;
 }
+
+
+class CAddonScreensaverAsteroids : public CAddon
+{
+public:
+  CAddonScreensaverAsteroids() { }
+
+  virtual ADDON_STATUS CreateInstance(void** addonInstance, void* kodiInstance) override;
+  virtual void DestroyInstance(void* addonInstance) override;
+};
+
+ADDON_STATUS CAddonScreensaverAsteroids::CreateInstance(void** addonInstance, void* kodiInstance)
+{
+  KodiAPI::Log(ADDON_LOG_DEBUG, "%s - Creating the Screensaver Asteroids add-on", __FUNCTION__);
+  *addonInstance = new CScreensaverAsteroids(kodiInstance);
+  return ADDON_STATUS_OK;
+}
+
+void CAddonScreensaverAsteroids::DestroyInstance(void* addonInstance)
+{
+  delete static_cast<CScreensaverAsteroids*>(addonInstance);
+}
+
+ADDONCREATOR(CAddonScreensaverAsteroids); // Don't touch this!

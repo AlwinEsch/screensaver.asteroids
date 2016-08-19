@@ -79,7 +79,6 @@ public:
 
 /***************************** G L O B A L S *******************************/
 
-extern  CConfig     gConfig;
 extern  CRenderD3D  gRender;
 
 /***************************** I N L I N E S *******************************/
