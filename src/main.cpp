@@ -23,7 +23,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 //
-#include "xbmc_scr_dll.h"
+
+#include <kodi/addon/screensaver/Addon.h>
+
 #ifndef WIN32
 #include <GL/gl.h>
 #else
@@ -37,32 +39,36 @@ CAsteroids*  gAsteroids = null;
 CRenderD3D   gRender;
 CTimer*      gTimer = null;
 
-extern "C" {
-
 #include <time.h>
 
-
-extern "C" void Stop();
-
-ADDON_STATUS ADDON_Create(void* hdl, void* props)
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+class CAsteroidsScreenSaver : public ::kodi::addon::screensaver::CAddon
 {
-  if (!props)
-    return ADDON_STATUS_UNKNOWN;
+public:
+  CAsteroidsScreenSaver(void* instance);
 
-  SCR_PROPS* scrprops = (SCR_PROPS*)props;
+  virtual void Start() override;
+  virtual void Render() override;
 
-  gRender.Init(scrprops->device);
-  gRender.m_Width = scrprops->width;
-  gRender.m_Height = scrprops->height;
+private:
+  void Stop();
+};
 
-  return ADDON_STATUS_OK;
+CAsteroidsScreenSaver::CAsteroidsScreenSaver(void* instance)
+  : CAddon(instance)
+{
+  gRender.Init(Device());
+  gRender.m_Width = Width();
+  gRender.m_Height = Height();
 }
 
 ////////////////////////////////////////////////////////////////////////////
 // XBMC tells us we should get ready to start rendering. This function
 // is called once when the screensaver is activated by XBMC.
 //
-extern "C" void Start()
+void CAsteroidsScreenSaver::Start()
 {
   srand((u32)time(null));
   gAsteroids = new CAsteroids();
@@ -79,7 +85,7 @@ extern "C" void Start()
 // each frame render in XBMC, you should render a single frame only - the DX
 // device will already have been cleared.
 //
-extern "C" void Render()
+void CAsteroidsScreenSaver::Render()
 {
   if (!gAsteroids)
     return;
@@ -94,7 +100,7 @@ extern "C" void Render()
 // XBMC tells us to stop the screensaver we should free any memory and release
 // any resources we have created.
 //
-extern "C" void Stop()
+void CAsteroidsScreenSaver::Stop()
 {
   if (!gAsteroids)
     return;
@@ -104,51 +110,26 @@ extern "C" void Stop()
   SAFE_DELETE(gTimer);
 }
 
-// XBMC tells us to stop the screensaver
-// we should free any memory and release
-// any resources we have created.
-extern "C" void ADDON_Stop()
-{
-}
 
-void ADDON_Destroy()
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+class CMyAddon : public ::kodi::addon::CAddonBase
 {
-}
-
-ADDON_STATUS ADDON_GetStatus()
-{
-  return ADDON_STATUS_OK;
-}
-
-bool ADDON_HasSettings()
-{
-  return false;
-}
-
-unsigned int ADDON_GetSettings(ADDON_StructSetting ***sSet)
-{
-  return 0;
-}
-
-ADDON_STATUS ADDON_SetSetting(const char *strSetting, const void *value)
-{
-  return ADDON_STATUS_OK;
-}
-
-void ADDON_FreeSettings()
-{
-}
-
-void ADDON_Announce(const char *flag, const char *sender, const char *message, const void *data)
-{
-}
-
-void GetInfo(SCR_INFO *info)
-{
-}
-
+public:
+  CMyAddon() { }
+  virtual ADDON_STATUS CreateInstance(int instanceType,
+                                      std::string instanceID,
+                                      KODI_HANDLE instance,
+                                      KODI_HANDLE& addonInstance) override;
 };
 
+ADDON_STATUS CMyAddon::CreateInstance(int instanceType, std::string instanceID, KODI_HANDLE instance, KODI_HANDLE& addonInstance)
+{
+  kodi::Log(LOG_NOTICE, "Creating Asteroids Screensaver");
+  addonInstance = new CAsteroidsScreenSaver(instance);
+  return ADDON_STATUS_OK;
+}
 
 ////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
@@ -326,3 +307,5 @@ void CRenderD3D::DrawLine(const CVector2& pos1, const CVector2& pos2, const CRGB
 
   m_NumLines++;
 }
+
+ADDONCREATOR(CMyAddon);
