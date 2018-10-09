@@ -29,6 +29,7 @@
 #include "timer.h"
 
 #include <time.h>
+#include <kodi/gui/shaders/ShaderGL.h>
 
 #define BUFFER_OFFSET(i) ((char *)nullptr + (i))
 
@@ -121,17 +122,13 @@ bool CMyAddon::Start()
   m_Verts = nullptr;
 
 #ifndef WIN32
-  m_shader = new CGUIShader("vert.glsl", "frag.glsl");
-  if (!m_shader->CompileAndLink())
-  {
-    delete m_shader;
-    m_shader = nullptr;
-    return false;
-  }
-
   glGenBuffers(1, &m_vertexVBO);
-  glGenBuffers(1, &m_indexVBO);
 
+  if (m_Verts == nullptr)
+  {
+    m_VertBuf = new TRenderVertex[10000];
+    m_Verts = m_VertBuf;
+  }
 #else
   m_pContext = reinterpret_cast<ID3D11DeviceContext*>(Device());
   ID3D11Device* pDevice = nullptr;
@@ -198,12 +195,10 @@ void CMyAddon::Stop()
   SAFE_DELETE(m_timer);
 
 #ifndef WIN32
+  SAFE_DELETE(m_VertBuf);
+
   glDeleteBuffers(1, &m_vertexVBO);
   m_vertexVBO = 0;
-  glDeleteBuffers(1, &m_indexVBO);
-  m_indexVBO = 0;
-
-  SAFE_DELETE(m_shader);
 #endif
 }
 
@@ -236,8 +231,8 @@ bool CMyAddon::Draw()
 
   for (size_t j = 0; j < m_NumLines * 2; ++j)
   {
-    vertex[j].x = (m_VertBuf[j].x - m_Width / 2.0f) / m_Width * 2.0f;
-    vertex[j].y = (m_VertBuf[j].y - m_Height / 2.0f) / m_Height * 2.0f;
+    vertex[j].x = m_VertBuf[j].x;
+    vertex[j].y = m_VertBuf[j].y;
     vertex[j].z = 0.0;
     vertex[j].r = m_VertBuf[j].col[0];
     vertex[j].g = m_VertBuf[j].col[1];
@@ -245,26 +240,27 @@ bool CMyAddon::Draw()
     idx[j] = j;
   }
 
-  GLint colLoc = m_shader->GetColLoc();
+  kodi::gui::gl::CPresentShader::EnableShader(kodi::gui::gl::SHADER_DEFAULT);
+  GLint posLoc = kodi::gui::gl::CPresentShader::ShaderGetPos();
+  GLint colLoc = kodi::gui::gl::CPresentShader::ShaderGetCol();
 
   glBindBuffer(GL_ARRAY_BUFFER, m_vertexVBO);
   glBufferData(GL_ARRAY_BUFFER, sizeof(PackedVertex)*m_NumLines*2, vertex, GL_STATIC_DRAW);
 
-  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_indexVBO);
-  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(idx), idx, GL_STATIC_DRAW);
-
-  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(PackedVertex), BUFFER_OFFSET(offsetof(PackedVertex, x)));
-  glEnableVertexAttribArray(0);
-
+  glVertexAttribPointer(posLoc, 3, GL_FLOAT, GL_FALSE, sizeof(PackedVertex), BUFFER_OFFSET(offsetof(PackedVertex, x)));
   glVertexAttribPointer(colLoc, 3, GL_FLOAT, GL_FALSE, sizeof(PackedVertex), BUFFER_OFFSET(offsetof(PackedVertex, r)));
+
+  glEnableVertexAttribArray(posLoc);
   glEnableVertexAttribArray(colLoc);
+
+  glDrawArrays(GL_LINES, 0, m_NumLines * 2);
+
+  glDisableVertexAttribArray(posLoc);
+  glDisableVertexAttribArray(colLoc);
 
   glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-  // render
-  m_shader->Enable();
-  glDrawArrays(GL_LINES, 0, m_NumLines * 2);
-  m_shader->Disable();
+  kodi::gui::gl::CPresentShader::DisableShader();
 
   m_Verts = m_VertBuf;
 #else
@@ -285,16 +281,11 @@ bool CMyAddon::Draw()
 void CMyAddon::DrawLine(const CVector2& pos1, const CVector2& pos2, const CRGBA& col1, const CRGBA& col2)
 {
   if (m_NumLines >= NUMLINES)
-  {
     Draw();
-  }
-#ifndef WIN32
-  if (m_Verts == nullptr)
-  {
-    m_VertBuf = new TRenderVertex[10000];
-    m_Verts = m_VertBuf;
-  }
-#endif
+
+  if (!m_Verts)
+    return;
+
   m_Verts->x = pos1.x; m_Verts->y = pos1.y; m_Verts->z = 0.0f;
   m_Verts->col[0] = col1.r;
   m_Verts->col[1] = col1.g;

@@ -19,25 +19,13 @@ if(NOT WIN32)
     set(APP_RENDER_SYSTEM gl)
     set(INCLUDES ${OPENGL_INCLUDE_DIR})
     set(DEPLIBS ${OPENGL_LIBRARIES})
-    set(ASTEROIDS_SOURCES src/shaders/GUIShader.cpp
-                          src/shaders/Matrix.cpp
-                          src/shaders/Shader.cpp)
-    set(ASTEROIDS_HEADERS src/shaders/GUIShader.h
-                          src/shaders/Matrix.h
-                          src/shaders/Shader.h)
     add_definitions(-DHAS_GL)
     message(STATUS "Asteroids screensaver via OpenGL")
   else()
     find_package(OpenGLES2)
     if(OPENGLES2_FOUND)
       set(APP_RENDER_SYSTEM gles)
-      set(ASTEROIDS_SOURCES src/shaders/GUIShader.cpp
-                            src/shaders/Matrix.cpp
-                            src/shaders/Shader.cpp)
-      set(ASTEROIDS_HEADERS src/shaders/GUIShader.h
-                            src/shaders/Matrix.h
-                            src/shaders/Shader.h)
-      add_definitions(-DHAS_GLES2)
+      add_definitions(-DHAS_GLES=2)
       set(INCLUDES ${OPENGLES2_INCLUDE_DIRS})
       set(DEPLIBS ${OPENGLES2_LIBRARIES})
       message(STATUS "Asteroids screensaver via OpenGLES")
