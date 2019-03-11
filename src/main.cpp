@@ -233,7 +233,7 @@ bool CMyAddon::Draw()
   glBindBuffer(GL_ARRAY_BUFFER, m_vertexVBO);
   glBufferData(GL_ARRAY_BUFFER, sizeof(TRenderVertex)*m_NumLines * 2, m_VertBuf, GL_STATIC_DRAW);
 
-  glVertexAttribPointer(m_aPosition, 3, GL_FLOAT, GL_FALSE, sizeof(TRenderVertex), BUFFER_OFFSET(offsetof(TRenderVertex, x)));
+  glVertexAttribPointer(m_aPosition, 4, GL_FLOAT, GL_FALSE, sizeof(TRenderVertex), BUFFER_OFFSET(offsetof(TRenderVertex, x)));
   glEnableVertexAttribArray(m_aPosition);
 
   glVertexAttribPointer(m_aColor, 4, GL_FLOAT, GL_FALSE, sizeof(TRenderVertex), BUFFER_OFFSET(offsetof(TRenderVertex, col)));
